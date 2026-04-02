@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn GenAI Search Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --surface2: #18181f; --surface3: #1e1e28;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --accent: #6c8fff; --accent2: #a78bfa; --accent3: #34d399;
+    --text: #f0f0f8; --muted: #7070a0; --muted2: #4a4a70;
+    --danger: #f87171; --warn: #fbbf24;
+    --card-hover: rgba(108,143,255,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 15px; line-height: 1.6; min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(108,143,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(108,143,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+  .header { padding: 48px 0 32px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .logo-text { font-family: 'DM Serif Display', serif; font-size: 22px; }
+  .logo-sub { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.05em; margin-top: 2px; }
+  .status-pill { display: flex; align-items: center; gap: 6px; background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--accent3); font-family: 'DM Mono', monospace; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent3); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--surface); border-radius: 10px; padding: 4px; }
+  .tab { flex: 1; padding: 9px 16px; border-radius: 7px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500; color: var(--muted); background: transparent; transition: all 0.2s; }
+  .tab.active { background: var(--surface3); color: var(--text); }
+  .tab:hover:not(.active) { color: var(--text); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .section-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  input[type=text], textarea, select { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 14px; color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; transition: border-color 0.2s; outline: none; resize: vertical; }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  input[type=text]::placeholder, textarea::placeholder { color: var(--muted2); }
+  select option { background: var(--surface2); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #0a0a1f; }
+  .btn-primary:hover { background: #8aabff; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+  .btn-ghost:hover { background: var(--surface3); }
+  .btn-sm { padding: 6px 14px; font-size: 12px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+  .search-box { background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .search-input-row { display: flex; gap: 10px; align-items: flex-start; }
+  .search-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+  .quick-queries { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .quick-q { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 6px 14px; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.2s; font-family: 'DM Mono', monospace; }
+  .quick-q:hover { border-color: var(--accent); color: var(--accent); background: rgba(108,143,255,0.05); }
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .results-count { font-size: 13px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 12px; transition: all 0.2s; position: relative; overflow: hidden; }
+  .result-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: 0; transition: opacity 0.2s; }
+  .result-card:hover { border-color: var(--border2); background: var(--card-hover); }
+  .result-card:hover::before { opacity: 1; }
+  .card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 10px; }
+  .avatar { width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .card-meta { flex: 1; }
+  .card-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .card-title { font-size: 13px; color: var(--muted); }
+  .card-company { color: var(--accent); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .tag { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-family: 'DM Mono', monospace; }
+  .tag-blue { background: rgba(108,143,255,0.12); color: var(--accent); border: 1px solid rgba(108,143,255,0.2); }
+  .tag-green { background: rgba(52,211,153,0.1); color: var(--accent3); border: 1px solid rgba(52,211,153,0.2); }
+  .tag-purple { background: rgba(167,139,250,0.1); color: var(--accent2); border: 1px solid rgba(167,139,250,0.2); }
+  .tag-warn { background: rgba(251,191,36,0.1); color: var(--warn); border: 1px solid rgba(251,191,36,0.2); }
+  .card-insight { font-size: 13px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 10px; }
+  .card-insight strong { color: var(--text); font-weight: 500; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; padding: 24px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 28px; max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; }
+  .modal-title { font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 16px; }
+  .message-type-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .msg-tab { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border2); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+  .msg-tab.active { background: var(--accent); color: #0a0a1f; border-color: var(--accent); }
+  .message-output { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.8; color: var(--text); min-height: 120px; white-space: pre-wrap; font-family: 'Outfit', sans-serif; }
+  .char-count { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 6px; text-align: right; }
+  .char-count.over { color: var(--danger); }
+  .loading-bar { display: none; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
+  .loading-bar.active { display: block; }
+  .loading-bar-fill { height: 100%; width: 0; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); animation: loadfill 2s ease-in-out infinite; }
+  @keyframes loadfill { 0%{width:0;opacity:1} 70%{width:85%;opacity:1} 100%{width:100%;opacity:0} }
+  .thinking { display: none; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 20px; font-family: 'DM Mono', monospace; }
+  .thinking.active { display: flex; }
+  .think-dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s infinite; }
+  .think-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .think-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-title { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--muted); margin-bottom: 8px; }
+  .empty-sub { font-size: 13px; line-height: 1.6; }
+  .profile-check { display: flex; align-items: center; gap: 8px; background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: var(--accent3); }
+  .saved-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; transition: all 0.15s; margin-bottom: 8px; }
+  .saved-item:hover { border-color: var(--accent); }
+  .error-box { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--danger); margin-bottom: 16px; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 3px; }
+  @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } .search-options { grid-template-columns: 1fr 1fr; } .header { flex-direction: column; gap: 12px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <div>
+        <div class="logo-text">LinkedIntel</div>
+        <div class="logo-sub">GenAI Recruiter Search Engine</div>
+      </div>
+    </div>
+    <div class="status-pill"><div class="status-dot"></div>AI-powered · web search enabled</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="profile" onclick="switchTab('profile')">👤 My Profile</button>
+    <button class="tab" data-tab="search" onclick="switchTab('search')">🔎 Search</button>
+    <button class="tab" data-tab="saved" onclick="switchTab('saved')">📋 Saved</button>
+  </div>
+
+  <!-- PROFILE PANEL -->
+  <div class="panel active" id="panel-profile">
+    <div id="profile-saved-indicator" style="display:none" class="profile-check">✓ Profile saved — ready to search</div>
+    <div class="section-label">Your LinkedIn Profile</div>
+    <div class="grid-2">
+      <div class="field"><label>Full name</label><input type="text" id="p-name" placeholder="Alex Johnson" /></div>
+      <div class="field"><label>Current title</label><input type="text" id="p-title" placeholder="VP of Product" /></div>
+    </div>
+    <div class="field"><label>About / Summary</label><textarea id="p-about" rows="4" placeholder="Paste your LinkedIn About section here..."></textarea></div>
+    <div class="field"><label>Recent experience (last 2–3 roles, one per line)</label><textarea id="p-roles" rows="5" placeholder="VP of Product, Acme FinTech — Led 80-person team, $200M platform&#10;Director, TechBank — Built risk analytics SaaS 0→$30M ARR&#10;Sr. PM, Goldman Sachs — Enterprise data products"></textarea></div>
+    <div class="grid-2">
+      <div class="field"><label>Skills (comma separated)</label><input type="text" id="p-skills" placeholder="Product Strategy, P&L, FinTech, SaaS, AI/ML" /></div>
+      <div class="field"><label>Education</label><input type="text" id="p-edu" placeholder="MBA, Wharton · BS Computer Science, NYU" /></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Target role levels</label>
+        <select id="p-levels" multiple style="height:90px">
+          <option value="Director" selected>Director</option>
+          <option value="Senior Director" selected>Senior Director</option>
+          <option value="VP" selected>VP</option>
+          <option value="SVP" selected>SVP</option>
+          <option value="EVP">EVP</option>
+          <option value="C-Suite">C-Suite (CPO, CTO, etc)</option>
+        </select>
+      </div>
+      <div class="field"><label>Target locations</label>
+        <select id="p-locs" multiple style="height:90px">
+          <option value="New York" selected>New York, NY</option>
+          <option value="New Jersey" selected>New Jersey</option>
+          <option value="Remote" selected>Remote</option>
+          <option value="Hybrid NY">Hybrid (NY area)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Target industries</label><input type="text" id="p-industries" placeholder="FinTech, Banking, SaaS, Enterprise Software, AI/ML" /></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveProfile()">Save profile</button>
+      <button class="btn btn-ghost" onclick="switchTab('search')">Go to search →</button>
+    </div>
+  </div>
+
+  <!-- SEARCH PANEL -->
+  <div class="panel" id="panel-search">
+    <div class="search-box">
+      <div class="search-input-row">
+        <input type="text" id="search-q" placeholder="e.g. Find recruiters hiring VP of Product in FinTech NY/Remote..." onkeydown="if(event.key==='Enter') runSearch()" style="flex:1;font-size:15px;padding:12px 16px;"/>
+        <button class="btn btn-primary" onclick="runSearch()" id="search-btn"><span>Search</span></button>
+      </div>
+      <div class="search-options">
+        <div class="field" style="margin:0"><label style="font-size:12px;margin-bottom:4px">Search type</label>
+          <select id="search-type">
+            <option value="recruiters">Recruiters to contact</option>
+            <option value="companies">Companies hiring</option>
+            <option value="roles">Open roles</option>
+            <option value="intel">Company intel</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label style="font-size:12px;margin-bottom:4px">Location filter</label>
+          <select id="search-loc">
+            <option value="NY/NJ/Remote">NY / NJ / Remote</option>
+            <option value="New York">New York only</option>
+            <option value="New Jersey">New Jersey only</option>
+            <option value="Remote">Remote only</option>
+            <option value="any">Any location</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label style="font-size:12px;margin-bottom:4px">Seniority</label>
+          <select id="search-seniority">
+            <option value="Director+">Director and above</option>
+            <option value="VP+">VP and above</option>
+            <option value="Director">Director level</option>
+            <option value="C-Suite">C-Suite</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:8px">Quick searches</div>
+    <div class="quick-queries">
+      <span class="quick-q" onclick="quickSearch('Find top FinTech recruiters in New York hiring VP and Director roles')">FinTech recruiters NYC</span>
+      <span class="quick-q" onclick="quickSearch('Find recruiters placing Director of Product Management roles in NY/NJ/Remote')">Product Director roles</span>
+      <span class="quick-q" onclick="quickSearch('Which banks and financial institutions in New York are hiring SVP and above product or technology leaders')">Banks hiring SVP+</span>
+      <span class="quick-q" onclick="quickSearch('Find remote Director and VP roles in SaaS or enterprise software companies')">Remote SaaS Director</span>
+      <span class="quick-q" onclick="quickSearch('AI and ML companies in New York hiring Director of Product or VP of Engineering')">AI/ML companies NY</span>
+      <span class="quick-q" onclick="quickSearch('What are the best executive search firms for technology leaders in New York')">Executive search firms</span>
+    </div>
+
+    <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill"></div></div>
+    <div class="thinking" id="thinking">
+      <div class="think-dots"><span></span><span></span><span></span></div>
+      <span id="thinking-text">Searching the web and analyzing results...</span>
+    </div>
+    <div id="error-area"></div>
+    <div id="results-area">
+      <div class="empty-state">
+        <div class="empty-icon">🔭</div>
+        <div class="empty-title">Your AI recruiter scout</div>
+        <div class="empty-sub">Enter a query above or click a quick search.<br>The AI searches the web in real time and matches results to your profile.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED PANEL -->
+  <div class="panel" id="panel-saved">
+    <div class="section-label">Saved recruiters & outreach tracker</div>
+    <div id="saved-list">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">No saved recruiters yet</div>
+        <div class="empty-sub">Save recruiters from search results and track your outreach here.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGE MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Craft outreach message</div>
+    <div class="message-type-tabs">
+      <button class="msg-tab active" data-msgtype="connect" onclick="switchMsgTab('connect')">Connection note</button>
+      <button class="msg-tab" data-msgtype="inmail" onclick="switchMsgTab('inmail')">Full message</button>
+      <button class="msg-tab" data-msgtype="email" onclick="switchMsgTab('email')">Email</button>
+    </div>
+    <div class="loading-bar" id="modal-loading"><div class="loading-bar-fill"></div></div>
+    <div class="message-output" id="modal-message">Generating personalized message...</div>
+    <div class="char-count" id="char-count"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary btn-sm" onclick="copyMessage(this)">Copy message</button>
+      <button class="btn btn-ghost btn-sm" onclick="regenerateMessage()">Regenerate</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveRecruiter()">Save recruiter</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── In-memory state (no localStorage) ───────────────────────────
+let profile = {};
+let currentResults = [];
+let currentRecruiter = null;
+let currentMsgType = 'connect';
+let savedRecruiters = [];
+
+// ─── Tab switching (uses data-tab attribute, not DOM order) ───────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'saved') renderSaved();
+}
+
+// ─── Profile ──────────────────────────────────────────────────────
+function saveProfile() {
+  profile = {
+    name: document.getElementById('p-name').value,
+    title: document.getElementById('p-title').value,
+    about: document.getElementById('p-about').value,
+    roles: document.getElementById('p-roles').value,
+    skills: document.getElementById('p-skills').value,
+    education: document.getElementById('p-edu').value,
+    levels: Array.from(document.getElementById('p-levels').selectedOptions).map(o => o.value).join(', '),
+    locations: Array.from(document.getElementById('p-locs').selectedOptions).map(o => o.value).join(', '),
+    industries: document.getElementById('p-industries').value,
+  };
+  document.getElementById('profile-saved-indicator').style.display = 'flex';
+  setTimeout(() => switchTab('search'), 800);
+}
+
+// ─── Search ───────────────────────────────────────────────────────
+function quickSearch(q) {
+  document.getElementById('search-q').value = q;
+  runSearch();
+}
+
+async function runSearch() {
+  const q = document.getElementById('search-q').value.trim();
+  if (!q) return;
+
+  const searchType = document.getElementById('search-type').value;
+  const loc = document.getElementById('search-loc').value;
+  const seniority = document.getElementById('search-seniority').value;
+
+  setLoading(true, 'Searching the web for real-time data...');
+  document.getElementById('error-area').innerHTML = '';
+
+  const profileContext = profile.name
+    ? `The user's profile: Name: ${profile.name}, Title: ${profile.title}, Skills: ${profile.skills}, Industries: ${profile.industries}, Experience: ${profile.roles}, Target levels: ${profile.levels}, Target locations: ${profile.locations}.`
+    : 'No profile saved yet — provide general results.';
+
+  const systemPrompt = `You are a GenAI recruiter search engine for LinkedIn job seekers. You search the web for real, current information about recruiters, companies, and open roles. You return results as a JSON array.
+
+${profileContext}
+
+Search focus: ${searchType}, Location: ${loc}, Seniority: ${seniority}.
+
+Return ONLY a valid JSON array (no markdown, no code fences, no explanation) with 4-6 result objects. Each object must have:
+- id: unique string
+- type: "recruiter" | "company" | "role"
+- name: full name (for recruiter) or company/role name
+- title: job title (for recruiter) or tagline
+- company: company name
+- location: location string
+- tags: array of 3-5 short keyword strings
+- matchScore: number 1-100 (how well this matches the user's profile)
+- insight: 2-3 sentence insight about why this is a good match, what they're hiring for, and how to approach them
+- linkedinUrl: a realistic LinkedIn search URL (use https://linkedin.com/search/results/people/?keywords=... format)
+- source: where this info comes from (e.g. "LinkedIn", "Company careers page", "Web search")
+
+Make results specific, realistic, and actionable. Include real companies and realistic recruiter personas for the NY/NJ FinTech/tech market.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: systemPrompt,
+        messages: [{ role: 'user', content: q }]
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+
+    const textBlocks = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+
+    // FIX: use a non-greedy, balanced approach — find the first [ and parse incrementally
+    let results = [];
+    const start = textBlocks.indexOf('[');
+    if (start !== -1) {
+      // Walk forward to find the matching closing bracket
+      let depth = 0, end = -1;
+      for (let i = start; i < textBlocks.length; i++) {
+        if (textBlocks[i] === '[') depth++;
+        else if (textBlocks[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
+      }
+      if (end !== -1) {
+        results = JSON.parse(textBlocks.slice(start, end + 1));
+      }
+    }
+
+    currentResults = results;
+    renderResults(results, q);
+  } catch (err) {
+    document.getElementById('error-area').innerHTML = `<div class="error-box">Search error: ${err.message}</div>`;
+    renderResults([], q);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on, msg) {
+  document.getElementById('loading-bar').classList.toggle('active', on);
+  document.getElementById('thinking').classList.toggle('active', on);
+  document.getElementById('search-btn').disabled = on;
+  if (msg) document.getElementById('thinking-text').textContent = msg;
+}
+
+function renderResults(results, query) {
+  const area = document.getElementById('results-area');
+  if (!results.length) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No results found</div><div class="empty-sub">Try a different query or broaden your search criteria.</div></div>`;
+    return;
+  }
+  const colors = ['#6c8fff','#a78bfa','#34d399','#fbbf24','#f87171','#22d3ee'];
+  const colorClasses = ['tag-blue','tag-purple','tag-green','tag-warn'];
+  area.innerHTML = `
+    <div class="results-header">
+      <span class="results-count">${results.length} results for "${query}"</span>
+      <span class="results-count">sorted by match score</span>
+    </div>
+    ${results.sort((a,b) => b.matchScore - a.matchScore).map((r, i) => {
+      const initials = r.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const color = colors[i % colors.length];
+      const score = r.matchScore || 75;
+      const scoreColor = score >= 80 ? 'var(--accent3)' : score >= 60 ? 'var(--accent)' : 'var(--warn)';
+      return `
+      <div class="result-card">
+        <div class="card-header">
+          <div class="avatar" style="background:${color}22;color:${color}">${initials}</div>
+          <div class="card-meta">
+            <div class="card-name">${r.name}</div>
+            <div class="card-title">${r.title} <span style="color:var(--muted)">·</span> <span class="card-company">${r.company}</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">${r.location} · ${r.source || 'Web'}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:20px;font-weight:600;color:${scoreColor};font-family:'DM Mono',monospace">${score}</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">match</div>
+          </div>
+        </div>
+        <div class="tags">${(r.tags||[]).map((t,ti) => `<span class="tag ${colorClasses[ti%colorClasses.length]}">${t}</span>`).join('')}</div>
+        <div class="card-insight">${r.insight}</div>
+        <div class="card-actions">
+          <button class="btn btn-primary btn-sm" onclick="openMessageModal(${i})">✉ Draft message</button>
+          <a href="${r.linkedinUrl}" target="_blank" class="btn btn-ghost btn-sm">↗ Find on LinkedIn</a>
+          <button class="btn btn-ghost btn-sm" onclick="quickSave(${i}, this)">+ Save</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ─── Message modal ────────────────────────────────────────────────
+async function openMessageModal(idx, fromSaved = false) {
+  // FIX: use dedicated source list instead of overwriting currentResults
+  currentRecruiter = fromSaved ? savedRecruiters[idx] : currentResults[idx];
+  document.getElementById('modal-title').textContent = `Message for ${currentRecruiter.name}`;
+  document.getElementById('modal').classList.add('open');
+  currentMsgType = 'connect';
+  document.querySelectorAll('.msg-tab').forEach(t => t.classList.toggle('active', t.dataset.msgtype === 'connect'));
+  await generateMessage();
+}
+
+function switchMsgTab(type) {
+  currentMsgType = type;
+  document.querySelectorAll('.msg-tab').forEach(t => t.classList.toggle('active', t.dataset.msgtype === type));
+  generateMessage();
+}
+
+async function generateMessage() {
+  if (!currentRecruiter) return;
+  document.getElementById('modal-loading').classList.add('active');
+  document.getElementById('modal-message').textContent = 'Generating...';
+  document.getElementById('char-count').textContent = '';
+
+  const typeInstructions = {
+    connect: 'Write a LinkedIn connection request note. MUST be under 300 characters. Personalized, professional, mentions 1 specific thing about their company/role. Do not start with "Hi I am".',
+    inmail: 'Write a full LinkedIn InMail (3-4 short paragraphs). Warm opener, 2-line experience summary, skills alignment, specific CTA. 150-200 words.',
+    email: 'Write a cold outreach email with subject line. Professional, concise, mentions specific role alignment. Under 200 words body.',
+  };
+
+  const profileSnippet = `My profile: ${profile.name || 'Senior executive'}, ${profile.title || 'technology leader'}. Recent experience: ${profile.roles || 'Director/VP level leadership roles'}. Key skills: ${profile.skills || 'product strategy, technology, leadership'}. Background: ${profile.about || ''}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: `${typeInstructions[currentMsgType]}\n\nRecruiter: ${currentRecruiter.name}, ${currentRecruiter.title} at ${currentRecruiter.company}. Context: ${currentRecruiter.insight}\n\n${profileSnippet}\n\nReturn only the message text, no preamble.`
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    document.getElementById('modal-message').textContent = text;
+    updateCharCount(text);
+  } catch(e) {
+    document.getElementById('modal-message').textContent = 'Error generating message: ' + e.message;
+  } finally {
+    document.getElementById('modal-loading').classList.remove('active');
+  }
+}
+
+function updateCharCount(text) {
+  const cc = document.getElementById('char-count');
+  if (currentMsgType === 'connect') {
+    cc.textContent = `${text.length} / 300 characters`;
+    cc.className = 'char-count' + (text.length > 300 ? ' over' : '');
+  } else {
+    cc.textContent = `${text.split(/\s+/).filter(Boolean).length} words`;
+    cc.className = 'char-count';
+  }
+}
+
+function regenerateMessage() { generateMessage(); }
+
+// FIX: button element passed explicitly instead of relying on implicit global `event`
+function copyMessage(btn) {
+  const text = document.getElementById('modal-message').textContent;
+  navigator.clipboard.writeText(text);
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => btn.textContent = 'Copy message', 1500);
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// ─── Save recruiter ───────────────────────────────────────────────
+// FIX: btn element passed explicitly instead of relying on implicit global `event`
+function quickSave(idx, btn) {
+  const r = currentResults[idx];
+  if (!savedRecruiters.find(s => s.name === r.name)) {
+    savedRecruiters.push({ ...r, savedAt: new Date().toISOString(), status: 'Not contacted' });
+    btn.textContent = '✓ Saved';
+    btn.disabled = true;
+  }
+}
+
+function saveRecruiter() {
+  if (currentRecruiter && !savedRecruiters.find(s => s.name === currentRecruiter.name)) {
+    savedRecruiters.push({ ...currentRecruiter, savedAt: new Date().toISOString(), status: 'Not contacted' });
+  }
+  closeModal();
+  switchTab('saved');
+}
+
+// ─── Saved panel ──────────────────────────────────────────────────
+function renderSaved() {
+  const el = document.getElementById('saved-list');
+  if (!savedRecruiters.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No saved recruiters yet</div><div class="empty-sub">Save recruiters from search results and track your outreach here.</div></div>`;
+    return;
+  }
+  const statuses = ['Not contacted','Request sent','Connected','Replied','No response'];
+  el.innerHTML = savedRecruiters.map((r, i) => `
+    <div class="saved-item">
+      <div>
+        <div style="font-size:14px;font-weight:500">${r.name}</div>
+        <div style="font-size:12px;color:var(--muted)">${r.title} · ${r.company} · ${r.location}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <select onchange="updateStatus(${i}, this.value)" style="background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'DM Mono',monospace">
+          ${statuses.map(s => `<option value="${s}"${r.status===s?' selected':''}>${s}</option>`).join('')}
+        </select>
+        <!-- FIX: passes index and fromSaved=true so currentResults is not mutated -->
+        <button class="btn btn-ghost btn-sm" onclick="openMessageModal(${i}, true)">✉ Message</button>
+      </div>
+    </div>`).join('');
+}
+
+function updateStatus(i, val) {
+  savedRecruiters[i].status = val;
+}
+</script>
+</body>
+</html>
