@@ -346,6 +346,7 @@ Return ONLY a valid JSON array (no markdown, no code fences, no explanation) wit
 Make results specific, realistic, and actionable. Include real companies and realistic recruiter personas for the NY/NJ FinTech/tech market.`;
 
   try {
+    const API_BASE = 'http://10.77.31.128:3000';
     const response = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
