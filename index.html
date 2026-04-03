@@ -346,13 +346,11 @@ Return ONLY a valid JSON array (no markdown, no code fences, no explanation) wit
 Make results specific, realistic, and actionable. Include real companies and realistic recruiter personas for the NY/NJ FinTech/tech market.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        q: q,
         system: systemPrompt,
         messages: [{ role: 'user', content: q }]
       })
